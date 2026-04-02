@@ -1,0 +1,39 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Build output
+build/
+dist/
+out/
+
+# Test binary
+*.test
+
+# Go coverage
+*.out
+*.prof
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Sensitive config (credentials, tokens, API keys)
+config.json
+credentials.json
+api_keys.json
+kiro_balance_cache.json
+kiro_groups.json
+kiro_routing.json
+kiro_stats.json
+kiro_token_usage.json
