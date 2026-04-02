@@ -62,7 +62,7 @@ func BuildHTTPClient(proxy *ProxyConfig, timeoutSecs int) (*http.Client, error) 
 		DialContext:           dialer.DialContext,
 		MaxIdleConns:          400,
 		MaxIdleConnsPerHost:   200,
-		IdleConnTimeout:       120 * time.Second,
+		IdleConnTimeout:       30 * time.Second, // 降低空闲连接保持时间，避免复用被上游关闭的 stale TLS 连接
 		TLSHandshakeTimeout:   dialTimeout,
 		ResponseHeaderTimeout: minDuration(DefaultConnectTimeout, timeout),
 		ForceAttemptHTTP2:     true,
