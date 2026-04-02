@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 )
 
-// MaxBudgetTokens thinking 模式最大预算 token 数
-const MaxBudgetTokens = 51200
+// MaxBudgetTokens 不限制，设为 0 表示透传客户端原始值
+const MaxBudgetTokens = 0
 
 // ---------------------------------------------------------------------------
 // 错误响应
@@ -154,10 +154,7 @@ func (r *MessagesRequest) GetThinking() *Thinking {
 	if v, ok := raw["budget_tokens"].(float64); ok {
 		t.BudgetTokens = int(v)
 	}
-	// 限制最大预算
-	if t.BudgetTokens > MaxBudgetTokens {
-		t.BudgetTokens = MaxBudgetTokens
-	}
+	// 不限制 budget_tokens，透传客户端原始值
 	return t
 }
 
