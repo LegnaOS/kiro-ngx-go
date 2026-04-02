@@ -634,7 +634,7 @@ func toSystemMaps(system interface{}) []map[string]interface{} {
 // reportTokenUsage 上报 token 用量到 tokenusage 和 apikeys
 func reportTokenUsage(r *http.Request, model string, inputTokens, outputTokens int) {
 	if tracker := tokenusage.GetTokenUsageTracker(); tracker != nil {
-		tracker.Report(model, inputTokens, outputTokens)
+		tracker.Report(model, inputTokens, outputTokens, 0, 0)
 	}
 	apiKey := GetApiKeyID(r.Context())
 	if apiKey != "" {

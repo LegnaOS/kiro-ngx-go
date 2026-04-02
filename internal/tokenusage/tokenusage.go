@@ -28,12 +28,16 @@ type TokenUsageTracker struct {
 	today          string                                // "2006-01-02" 格式的今日日期
 	todayInput     int                                   // 今日输入 token 总量
 	todayOutput    int                                   // 今日输出 token 总量
+	todayCacheCreation int                               // 今日 cache creation tokens
+	todayCacheRead     int                               // 今日 cache read tokens
 	yesterdayInput int                                   // 昨日输入 token 总量
 	yesterdayOutput int                                  // 昨日输出 token 总量
-	modelToday     map[string]map[string]int             // 今日每模型用量 {model: {"input": n, "output": n}}
+	yesterdayCacheCreation int                            // 昨日 cache creation tokens
+	yesterdayCacheRead     int                            // 昨日 cache read tokens
+	modelToday     map[string]map[string]int             // 今日每模型用量 {model: {"input": n, "output": n, "cache_creation": n, "cache_read": n}}
 	modelYesterday map[string]map[string]int             // 昨日每模型用量
-	hourlyToday    map[string]map[string]int             // 今日小时级用量 {"00": {"input": n, "output": n}}
-	dailyHistory   map[string]map[string]interface{}     // 历史日聚合 {"2026-03-18": {"input": n, "output": n, "models": {...}}}
+	hourlyToday    map[string]map[string]int             // 今日小时级用量 {"00": {"input": n, "output": n, "cache_creation": n, "cache_read": n}}
+	dailyHistory   map[string]map[string]interface{}     // 历史日聚合
 	lastSaveAt     *float64                              // 上次保存时间（单调时钟秒数）
 	dirty          bool                                  // 是否有未落盘的变更
 }
@@ -43,8 +47,12 @@ type cacheFile struct {
 	Date           string                            `json:"date"`
 	TodayInput     int                               `json:"todayInput"`
 	TodayOutput    int                               `json:"todayOutput"`
+	TodayCacheCreation int                            `json:"todayCacheCreation"`
+	TodayCacheRead     int                            `json:"todayCacheRead"`
 	YesterdayInput int                               `json:"yesterdayInput"`
 	YesterdayOutput int                              `json:"yesterdayOutput"`
+	YesterdayCacheCreation int                        `json:"yesterdayCacheCreation"`
+	YesterdayCacheRead     int                        `json:"yesterdayCacheRead"`
 	ModelToday     map[string]map[string]int          `json:"modelToday"`
 	ModelYesterday map[string]map[string]int          `json:"modelYesterday"`
 	HourlyToday    map[string]map[string]int          `json:"hourlyToday"`
@@ -69,26 +77,32 @@ func NewTokenUsageTracker(cacheDir string) *TokenUsageTracker {
 }
 
 // Report 累加一次请求的 token 用量
-func (t *TokenUsageTracker) Report(model string, inputTokens, outputTokens int) {
+func (t *TokenUsageTracker) Report(model string, inputTokens, outputTokens, cacheCreation, cacheRead int) {
 	t.mu.Lock()
 	t.maybeRotate()
 	t.todayInput += inputTokens
 	t.todayOutput += outputTokens
+	t.todayCacheCreation += cacheCreation
+	t.todayCacheRead += cacheRead
 
 	// 模型维度
 	if _, ok := t.modelToday[model]; !ok {
-		t.modelToday[model] = map[string]int{"input": 0, "output": 0}
+		t.modelToday[model] = map[string]int{"input": 0, "output": 0, "cache_creation": 0, "cache_read": 0}
 	}
 	t.modelToday[model]["input"] += inputTokens
 	t.modelToday[model]["output"] += outputTokens
+	t.modelToday[model]["cache_creation"] += cacheCreation
+	t.modelToday[model]["cache_read"] += cacheRead
 
 	// 小时级
 	hour := time.Now().Format("15")
 	if _, ok := t.hourlyToday[hour]; !ok {
-		t.hourlyToday[hour] = map[string]int{"input": 0, "output": 0}
+		t.hourlyToday[hour] = map[string]int{"input": 0, "output": 0, "cache_creation": 0, "cache_read": 0}
 	}
 	t.hourlyToday[hour]["input"] += inputTokens
 	t.hourlyToday[hour]["output"] += outputTokens
+	t.hourlyToday[hour]["cache_creation"] += cacheCreation
+	t.hourlyToday[hour]["cache_read"] += cacheRead
 
 	t.dirty = true
 	t.mu.Unlock()
@@ -128,8 +142,8 @@ func (t *TokenUsageTracker) GetStats() map[string]interface{} {
 	}
 
 	return map[string]interface{}{
-		"today":     map[string]int{"input": t.todayInput, "output": t.todayOutput},
-		"yesterday": map[string]int{"input": t.yesterdayInput, "output": t.yesterdayOutput},
+		"today":     map[string]int{"input": t.todayInput, "output": t.todayOutput, "cache_creation": t.todayCacheCreation, "cache_read": t.todayCacheRead},
+		"yesterday": map[string]int{"input": t.yesterdayInput, "output": t.yesterdayOutput, "cache_creation": t.yesterdayCacheCreation, "cache_read": t.yesterdayCacheRead},
 		"models":    models,
 	}
 }
@@ -199,7 +213,7 @@ func (t *TokenUsageTracker) GetHourly() map[string]interface{} {
 		if entry, ok := t.hourlyToday[key]; ok {
 			result[key] = copyIntMap(entry)
 		} else {
-			result[key] = map[string]int{"input": 0, "output": 0}
+			result[key] = map[string]int{"input": 0, "output": 0, "cache_creation": 0, "cache_read": 0}
 		}
 	}
 	return result
@@ -241,11 +255,15 @@ func (t *TokenUsageTracker) maybeRotate() {
 	// 今日 → 昨日
 	t.yesterdayInput = t.todayInput
 	t.yesterdayOutput = t.todayOutput
+	t.yesterdayCacheCreation = t.todayCacheCreation
+	t.yesterdayCacheRead = t.todayCacheRead
 	t.modelYesterday = t.modelToday
 
 	// 重置今日
 	t.todayInput = 0
 	t.todayOutput = 0
+	t.todayCacheCreation = 0
+	t.todayCacheRead = 0
 	t.modelToday = make(map[string]map[string]int)
 	t.hourlyToday = make(map[string]map[string]int)
 	t.today = nowStr
@@ -302,8 +320,12 @@ func (t *TokenUsageTracker) load() {
 		// 存档日期是今天，直接恢复
 		t.todayInput = cf.TodayInput
 		t.todayOutput = cf.TodayOutput
+		t.todayCacheCreation = cf.TodayCacheCreation
+		t.todayCacheRead = cf.TodayCacheRead
 		t.yesterdayInput = cf.YesterdayInput
 		t.yesterdayOutput = cf.YesterdayOutput
+		t.yesterdayCacheCreation = cf.YesterdayCacheCreation
+		t.yesterdayCacheRead = cf.YesterdayCacheRead
 		if cf.ModelToday != nil {
 			t.modelToday = cf.ModelToday
 		}
@@ -354,8 +376,12 @@ func (t *TokenUsageTracker) save() {
 		Date:            t.today,
 		TodayInput:      t.todayInput,
 		TodayOutput:     t.todayOutput,
+		TodayCacheCreation: t.todayCacheCreation,
+		TodayCacheRead:     t.todayCacheRead,
 		YesterdayInput:  t.yesterdayInput,
 		YesterdayOutput: t.yesterdayOutput,
+		YesterdayCacheCreation: t.yesterdayCacheCreation,
+		YesterdayCacheRead:     t.yesterdayCacheRead,
 		ModelToday:      t.modelToday,
 		ModelYesterday:  t.modelYesterday,
 		HourlyToday:     t.hourlyToday,
