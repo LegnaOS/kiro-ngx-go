@@ -6,7 +6,7 @@ import (
 )
 
 // MaxBudgetTokens thinking 模式最大预算 token 数
-const MaxBudgetTokens = 24576
+const MaxBudgetTokens = 51200
 
 // ---------------------------------------------------------------------------
 // 错误响应
