@@ -298,8 +298,10 @@ func handleNonStreamRequest(w http.ResponseWriter, r *http.Request, state *AppSt
 		"stop_reason":   stopReason,
 		"stop_sequence": nil,
 		"usage": map[string]interface{}{
-			"input_tokens":  finalInput,
-			"output_tokens": outputTokens,
+			"input_tokens":                finalInput,
+			"output_tokens":               outputTokens,
+			"cache_creation_input_tokens": 0,
+			"cache_read_input_tokens":     0,
 		},
 	})
 }

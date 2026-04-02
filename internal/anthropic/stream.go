@@ -160,7 +160,7 @@ func (s *SseStateManager) GenerateFinalEvents(inputTokens, outputTokens int) []*
 			Data: map[string]interface{}{
 				"type":  "message_delta",
 				"delta": map[string]interface{}{"stop_reason": stopReason, "stop_sequence": nil},
-				"usage": map[string]interface{}{"input_tokens": inputTokens, "output_tokens": outputTokens},
+				"usage": map[string]interface{}{"input_tokens": inputTokens, "output_tokens": outputTokens, "cache_creation_input_tokens": 0, "cache_read_input_tokens": 0},
 			},
 		})
 	}
@@ -242,8 +242,10 @@ func (sc *StreamContext) CreateMessageStartEvent() map[string]interface{} {
 		"stop_reason":  nil,
 		"stop_sequence": nil,
 		"usage": map[string]interface{}{
-			"input_tokens":  sc.InputTokens,
-			"output_tokens": 0,
+			"input_tokens":                sc.InputTokens,
+			"output_tokens":               0,
+			"cache_creation_input_tokens": 0,
+			"cache_read_input_tokens":     0,
 		},
 	}
 }
